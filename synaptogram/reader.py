@@ -88,8 +88,8 @@ class BaseImarisReader(BaseReader):
                 np.abs(zub-zlb) / zvoxels,
             ],
             'channels': [
-                {'name': 'CtBP2'},
                 {'name': 'GluR2'},
+                {'name': 'CtBP2'},
                 {'name': 'MyosinVIIa'},
             ],
         }

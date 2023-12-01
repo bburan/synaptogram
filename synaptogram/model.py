@@ -2,7 +2,7 @@ from matplotlib import transforms as T
 import numpy as np
 import pandas as pd
 
-from atom.api import Atom, Dict, Int, Typed
+from atom.api import Atom, Dict, Int, Str, Typed, Value
 
 from ndimage_enaml.model import NDImage
 from ndimage_enaml.util import get_image, tile_images
@@ -13,15 +13,25 @@ class TiledNDImage(Atom):
     info = Dict()
     tile_info = Typed(pd.DataFrame)
     tiles = Typed(np.ndarray)
-    n_cols = Int(15)
+    n_cols = Int(20)
     padding = Int(1)
+    sort_channel = Str()
+    sort_value = Str()
+    ordering = Value()
 
     def __init__(self, info, tile_info, tiles, **kwargs):
         super().__init__(info=info, tile_info=tile_info, tiles=tiles, **kwargs)
 
     def get_image(self, *args, **kwargs):
+        print('getting image')
+        fn = getattr(np, self.sort_value)
+        if self.sort_channel:
+            c = self.channel_names.index(self.sort_channel)
+            self.ordering = fn(self.tiles[..., c], axis=(1, 2, 3)).argsort()
+        else:
+            self.ordering = fn(self.tiles, axis=(1, 2, 3, 4)).argsort()
         images = get_image(self.tiles, self.channel_names, *args, **kwargs)
-        return tile_images(images, self.n_cols, self.padding)
+        return tile_images(images[self.ordering], self.n_cols, self.padding)
 
     @property
     def z_slice_max(self):
@@ -49,7 +59,6 @@ class TiledNDImage(Atom):
         return T.Affine2D()
 
     def tile_index(self, x, y):
-        print(x, y)
         xs, ys = self.tiles.shape[1:3]
         xs += self.padding
         ys += self.padding
@@ -58,7 +67,8 @@ class TiledNDImage(Atom):
         if (xi < 0) or (yi < 0):
             return -1
         if (i := yi * self.n_cols + xi) < len(self.tiles):
-            return int(i)
+            i = int(i)
+            return self.ordering[i]
         return -1
 
 

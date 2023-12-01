@@ -1,44 +1,26 @@
+from enaml.core.api import Conditional
 from enaml.layout.api import (
-        AreaLayout, DockBarLayout, HSplitLayout, TabLayout, VSplitLayout
+        align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout, TabLayout, VSplitLayout
 )
 from enaml.widgets.api import (
     Action, Container, DockArea, DockItem, MainWindow, Menu, MenuBar, MPLCanvas
 )
 
 
+from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageDockItem
+
+
 def open_imaris_file(window):
     pass
 
 
-enamldef PointsCanvas(MPLCanvas):
-    pass
-
-
-enamldef PointsDockItem(DockItem): dock_item:
-
-    title = 'Points'
-    attr presenter
-
-    Container: container:
-        pass
-
-    PointsCanvas: canvas:
-        figure << presenter.figure
-        toolbar_visible = False
-
-
-from ndimage_enaml.gui import NDImageDockItem
+from enaml.widgets.api import Label, ObjectCombo
 
 
 enamldef SynaptogramWindow(MainWindow): window:
 
     attr current_path
     attr presenter
-
-    initialized ::
-        overview.figure = presenter.overview.figure
-        points.figure = presenter.points.figure
-
 
     MenuBar:
         Menu:
@@ -56,7 +38,7 @@ enamldef SynaptogramWindow(MainWindow): window:
         DockArea: workspace:
             name = 'dock_area'
             layout = AreaLayout(
-                    HSplitLayout('overview', 'points', sizes=[1, 3]),
+                    HSplitLayout('overview', 'points', sizes=[1, 4]),
                     dock_bars=[DockBarLayout('help', position='left'),]
                     )
 
@@ -68,7 +50,31 @@ enamldef SynaptogramWindow(MainWindow): window:
             NDImageDockItem: overview:
                 name = 'overview'
                 title = 'Overview'
+                presenter << window.presenter.overview if window.presenter is not None else None
 
-            NDImageDockItem: points:
+            DockItem: points:
                 name = 'points'
                 title = 'Points'
+                Conditional:
+                    condition << window.presenter is not None
+                    Container:
+                        DisplayConfig:
+                            presenter << window.presenter.points
+                        Container:
+                            constraints = [
+                                hbox(sort_label, sort, sort_value, sort_value_label, spacer(0)),
+                                align('v_center', sort_label, sort, sort_value, sort_value_label)
+                            ]
+                            Label: sort_label:
+                                text = 'Sort by'
+                            ObjectCombo: sort:
+                                items << window.presenter.points.obj.channel_names
+                                selected := window.presenter.points.artist.sort_channel
+                            ObjectCombo: sort_value:
+                                items = ['mean', 'max', 'median']
+                                selected := window.presenter.points.artist.sort_value
+                            Label: sort_value_label:
+                                text = 'intensity'
+                        NDImageCanvas:
+                            toolbar_visible = False
+                            figure << window.presenter.points.figure
