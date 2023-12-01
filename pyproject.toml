@@ -1,0 +1,34 @@
+[project]
+name = "synaptogram"
+description = "Module for helping assess synapse counts"
+readme = "readme.rst"
+requires-python = ">=3.7"
+license = {file = "LICENSE.txt"}
+authors = [
+    {name = "Brad Buran", email="buran@ohsu.edu"},
+]
+maintainers = [
+    {name = "Brad Buran", email="buran@ohsu.edu"},
+]
+dependencies = [
+    "atom",
+    "enaml[qt6-pyside]",
+    "matplotlib",
+    "numpy",
+    "pandas",
+	"tables",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = ["docutils"]
+
+[project.scripts]
+synaptogram = "synaptogram.main:main"
+
+[build-system]
+requires = ["setuptools>=61.2", "wheel", "setuptools_scm[toml]>=3.4.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "synaptogram/version.py"

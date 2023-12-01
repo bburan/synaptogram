@@ -1,0 +1,74 @@
+from enaml.layout.api import (
+        AreaLayout, DockBarLayout, HSplitLayout, TabLayout, VSplitLayout
+)
+from enaml.widgets.api import (
+    Action, Container, DockArea, DockItem, MainWindow, Menu, MenuBar, MPLCanvas
+)
+
+
+def open_imaris_file(window):
+    pass
+
+
+enamldef PointsCanvas(MPLCanvas):
+    pass
+
+
+enamldef PointsDockItem(DockItem): dock_item:
+
+    title = 'Points'
+    attr presenter
+
+    Container: container:
+        pass
+
+    PointsCanvas: canvas:
+        figure << presenter.figure
+        toolbar_visible = False
+
+
+from ndimage_enaml.gui import NDImageDockItem
+
+
+enamldef SynaptogramWindow(MainWindow): window:
+
+    attr current_path
+    attr presenter
+
+    initialized ::
+        overview.figure = presenter.overview.figure
+        points.figure = presenter.points.figure
+
+
+    MenuBar:
+        Menu:
+            title = '&File'
+            Action:
+                text = 'Open Imaris file'
+                triggered::
+                    try:
+                        open_imaris_file(window)
+                    except Exception as e:
+                        log.exception(e)
+                        critical(Window, 'Open', str(e))
+
+    Container:
+        DockArea: workspace:
+            name = 'dock_area'
+            layout = AreaLayout(
+                    HSplitLayout('overview', 'points', sizes=[1, 3]),
+                    dock_bars=[DockBarLayout('help', position='left'),]
+                    )
+
+            DockItem:
+                name = 'help'
+                title = 'Help'
+                closable = False
+
+            NDImageDockItem: overview:
+                name = 'overview'
+                title = 'Overview'
+
+            NDImageDockItem: points:
+                name = 'points'
+                title = 'Points'
