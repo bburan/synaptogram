@@ -2,7 +2,8 @@ from matplotlib import transforms as T
 import numpy as np
 import pandas as pd
 
-from atom.api import Atom, Dict, Int, Str, Typed, Value
+from atom.api import Atom, Dict, Float, Int, Str, Typed, Value
+from raster_geometry import sphere
 
 from ndimage_enaml.model import NDImage
 from ndimage_enaml.util import get_image, tile_images
@@ -14,17 +15,19 @@ class TiledNDImage(Atom):
     tile_info = Typed(pd.DataFrame)
     tiles = Typed(np.ndarray)
     n_cols = Int(20)
-    padding = Int(1)
+    padding = Int(2)
+
     sort_channel = Str()
     sort_value = Str()
     sort_radius = Float(0.5)
     ordering = Value()
 
+    labels = Dict()
+
     def __init__(self, info, tile_info, tiles, **kwargs):
         super().__init__(info=info, tile_info=tile_info, tiles=tiles, **kwargs)
 
     def get_image(self, *args, **kwargs):
-        print('getting image')
         fn = getattr(np, self.sort_value)
         template = sphere(self.tiles.shape[1:-1], self.sort_radius / self.get_voxel_size('x'))
         if self.sort_channel:
@@ -35,7 +38,10 @@ class TiledNDImage(Atom):
             tiles = self.tiles * template[..., np.newaxis]
             self.ordering = fn(self.tiles, axis=(1, 2, 3, 4)).argsort()
         images = get_image(self.tiles, self.channel_names, *args, **kwargs)
-        return tile_images(images[self.ordering], self.n_cols, self.padding)
+
+        ordering = self.ordering.tolist()
+        labels = {l: [ordering.index(i) for i in s] for l, s in self.labels.items()}
+        return tile_images(images[self.ordering], self.n_cols, self.padding, labels)
 
     @property
     def z_slice_max(self):
@@ -47,9 +53,6 @@ class TiledNDImage(Atom):
 
     def get_voxel_size(self, dim):
         return self.info['voxel_size']['xyz'.index(dim)]
-
-    def get_voxel_size(self, dim):
-        return 1
 
     def get_image_extent(self):
         n = len(self.tiles)
@@ -74,6 +77,24 @@ class TiledNDImage(Atom):
             i = int(i)
             return self.ordering[i]
         return -1
+
+    def label_tile(self, x, y, label):
+        i = self.tile_index(x, y)
+        self.labels.setdefault(label, set()).add(i)
+
+    def unlabel_tile(self, x, y, label=None):
+        i = self.tile_index(x, y)
+        if label is None:
+            for l, indices in self.labels.items():
+                if l == 'selected':
+                    continue
+                if i in indices:
+                    indices.remove(i)
+
+    def select_tile(self, x, y):
+        i = self.tile_index(x, y)
+        self.labels['selected'] = set([i])
+        return self.tile_info.iloc[i].to_dict()
 
 
 class Points(Atom):

@@ -1,4 +1,4 @@
-from atom.api import Atom, Bool, Event, Instance, Int, Str, Typed, Value
+from atom.api import Atom, Bool, Event, Float, Instance, Int, Str, Typed, Value
 from enaml.application import deferred_call
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -61,6 +61,7 @@ class PointsPresenter(NDImageCollectionPresenter):
     obj = Instance(TiledNDImage)
     artist = Value()
     selected = Value()
+    selected_coords = Value()
 
     @property
     def current_artist(self):
@@ -74,8 +75,19 @@ class PointsPresenter(NDImageCollectionPresenter):
 
     def right_button_press(self, event):
         x, y = event.xdata, event.ydata
-        i = self.obj.tile_index(x, y)
-        self.selected = self.obj.tile_info.iloc[i].to_dict()
+        self.selected = self.obj.select_tile(x, y)
+        self.selected_coords = x, y
+        self.artist.request_redraw()
+
+    def key_press(self, event):
+        print(event.key)
+        if event.key.lower() == 'd':
+            self.obj.label_tile(*self.selected_coords, 'artifact')
+        if event.key.lower() == 'o':
+            self.obj.label_tile(*self.selected_coords, 'orphan')
+        if event.key.lower() == 'c':
+            self.obj.unlabel_tile(*self.selected_coords)
+        self.artist.request_redraw()
 
     def check_for_changes(self):
         pass
@@ -91,7 +103,6 @@ class SynaptogramPresenter(Atom):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.points.observe('selected', self.overview.highlight_selected)
-
 
     def _observe_obj(self, event):
         self.overview.obj = NDImageCollection([self.obj.overview])
