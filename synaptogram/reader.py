@@ -110,10 +110,12 @@ class BaseImarisReader(BaseReader):
         xyz_max = self.image.shape[:-1]
         points = self.points.xs(point_name, level='marker')
         volumes = []
+        lower = int(np.ceil(size / 2))
+        upper = int(np.floor(size / 2))
         for _, point in points.iterrows():
             i = point[['xi', 'yi', 'zi']].abs().astype('i').values
-            lb = np.clip(i - 5, 0, xyz_max)
-            ub = np.clip(i + 5, 0, xyz_max)
+            lb = np.clip(i - lower, 0, xyz_max)
+            ub = np.clip(i + upper, 0, xyz_max)
             s = np.s_[*[slice(l, u) for l, u in zip(lb, ub)]]
             image = self.image[s]
 
