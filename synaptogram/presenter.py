@@ -32,8 +32,8 @@ class OverviewPresenter(NDImageCollectionPresenter):
                 )
         self.axes.axis(extent)
         self.highlight_artist.set_center((value['x'], value['y']))
-        self.highlight_artist.set_radius(1)
-        self.current_artist.z_slice = int(value['zi'])
+        self.highlight_artist.set_radius(0.5)
+        self.current_artist.center_z_substack(int(value['zi']))
         self.request_redraw()
 
 
