@@ -39,11 +39,15 @@ class OverviewPresenter(NDImageCollectionPresenter):
 
 class TiledNDImagePlot(NDImagePlot):
 
-    sort_channel = Str()
-    sort_value = Str()
+    sort_channel = Str('GluR2')
+    sort_value = Str('max')
+    sort_radius = Float(0.5)
+
+    def _observe_sort_radius(self, event):
+        self.ndimage.sort_radius = self.sort_radius
+        self.request_redraw()
 
     def _observe_sort_channel(self, event):
-        print('requesting redraw')
         self.ndimage.sort_channel = self.sort_channel
         self.request_redraw()
 

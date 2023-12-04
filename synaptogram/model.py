@@ -17,6 +17,7 @@ class TiledNDImage(Atom):
     padding = Int(1)
     sort_channel = Str()
     sort_value = Str()
+    sort_radius = Float(0.5)
     ordering = Value()
 
     def __init__(self, info, tile_info, tiles, **kwargs):
@@ -25,10 +26,13 @@ class TiledNDImage(Atom):
     def get_image(self, *args, **kwargs):
         print('getting image')
         fn = getattr(np, self.sort_value)
+        template = sphere(self.tiles.shape[1:-1], self.sort_radius / self.get_voxel_size('x'))
         if self.sort_channel:
             c = self.channel_names.index(self.sort_channel)
-            self.ordering = fn(self.tiles[..., c], axis=(1, 2, 3)).argsort()
+            tiles = self.tiles[..., c] * template
+            self.ordering = fn(tiles, axis=(1, 2, 3)).argsort()
         else:
+            tiles = self.tiles * template[..., np.newaxis]
             self.ordering = fn(self.tiles, axis=(1, 2, 3, 4)).argsort()
         images = get_image(self.tiles, self.channel_names, *args, **kwargs)
         return tile_images(images[self.ordering], self.n_cols, self.padding)
