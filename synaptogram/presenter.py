@@ -7,6 +7,7 @@ from matplotlib.patches import Circle
 import numpy as np
 
 from ndimage_enaml.model import NDImageCollection
+from ndimage_enaml.util import project_image
 from ndimage_enaml.presenter import FigurePresenter, NDImageCollectionPresenter, NDImagePlot
 
 from .model import Points, TiledNDImage
@@ -80,7 +81,6 @@ class PointsPresenter(NDImageCollectionPresenter):
         self.artist.request_redraw()
 
     def key_press(self, event):
-        print(event.key)
         if event.key.lower() == 'd':
             self.obj.label_tile(*self.selected_coords, 'artifact')
         if event.key.lower() == 'o':
@@ -93,17 +93,39 @@ class PointsPresenter(NDImageCollectionPresenter):
         pass
 
 
+class PointProjectionPresenter(FigurePresenter):
+
+    obj = Value()
+    artist = Value()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.axes.set_axis_off()
+        self.artist = self.axes.imshow(np.array([[0, 1], [0, 1]]), origin="lower")
+
+    def highlight_selected(self, event):
+        tile = self.obj.tiles[event['value']['i']]
+        img = project_image(tile, self.obj.channel_names)
+        self.artist.set_data(img)
+        y, x = img.shape[:2]
+        self.artist.set_extent((0, x, 0, y))
+        self.figure.canvas.draw()
+
 
 class SynaptogramPresenter(Atom):
 
     obj = Typed(object)
     overview = Instance(OverviewPresenter, {})
     points = Instance(PointsPresenter, {})
+    point_projection = Instance(PointProjectionPresenter, {})
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.points.observe('selected', self.overview.highlight_selected)
+        self.points.observe('selected', self.point_projection.highlight_selected)
 
     def _observe_obj(self, event):
-        self.overview.obj = NDImageCollection([self.obj.overview])
-        self.points.obj = self.obj.points
+        if self.obj is not None:
+            self.overview.obj = NDImageCollection([self.obj.overview])
+            self.points.obj = self.obj.points
+            self.point_projection.obj = self.obj.points

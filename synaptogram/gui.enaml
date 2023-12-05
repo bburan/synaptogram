@@ -39,7 +39,7 @@ enamldef SynaptogramWindow(MainWindow): window:
         DockArea: workspace:
             name = 'dock_area'
             layout = AreaLayout(
-                    HSplitLayout('overview', 'points', sizes=[1, 4]),
+                    HSplitLayout(VSplitLayout('projection', 'overview'), 'points', sizes=[1, 4]),
                     dock_bars=[DockBarLayout('help', position='left'),]
                     )
 
@@ -47,6 +47,15 @@ enamldef SynaptogramWindow(MainWindow): window:
                 name = 'help'
                 title = 'Help'
                 closable = False
+
+            DockItem:
+                name = 'projection'
+                title = 'Synapse projection'
+                closable = False
+                Container:
+                    MPLCanvas:
+                        toolbar_visible = False
+                        figure << window.presenter.point_projection.figure
 
             NDImageDockItem: overview:
                 name = 'overview'
@@ -57,7 +66,7 @@ enamldef SynaptogramWindow(MainWindow): window:
                 name = 'points'
                 title = 'Points'
                 Conditional:
-                    condition << window.presenter is not None
+                    condition << window.presenter.obj is not None
                     Container:
                         DisplayConfig:
                             presenter << window.presenter.points

@@ -80,10 +80,14 @@ class TiledNDImage(Atom):
 
     def label_tile(self, x, y, label):
         i = self.tile_index(x, y)
+        if i == -1:
+            return
         self.labels.setdefault(label, set()).add(i)
 
     def unlabel_tile(self, x, y, label=None):
         i = self.tile_index(x, y)
+        if i == -1:
+            return
         if label is None:
             for l, indices in self.labels.items():
                 if l == 'selected':
@@ -93,8 +97,12 @@ class TiledNDImage(Atom):
 
     def select_tile(self, x, y):
         i = self.tile_index(x, y)
+        if i == -1:
+            return
         self.labels['selected'] = set([i])
-        return self.tile_info.iloc[i].to_dict()
+        result = self.tile_info.iloc[i].to_dict()
+        result['i'] = i
+        return result
 
 
 class Points(Atom):
