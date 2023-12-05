@@ -1,27 +1,59 @@
+import logging
+log = logging.getLogger(__name__)
+
+from importlib import resources
+
 from enaml.core.api import Conditional
+from enaml.icon import Icon, IconImage
+from enaml.image import Image
 from enaml.layout.api import (
         align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout, TabLayout, VSplitLayout
 )
 from enaml.stdlib.fields import FloatField
+from enaml.stdlib.message_box import critical
 from enaml.widgets.api import (
-    Action, Container, DockArea, DockItem, MainWindow, Menu, MenuBar, MPLCanvas
+    Action, Container, DockArea, DockItem, FileDialogEx, Label, MainWindow,
+    Menu, MenuBar, MPLCanvas, ObjectCombo
 )
 
 
 from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageDockItem
 
 
+def load_icon(name):
+    data = resources.files('synaptogram.icons').joinpath(f'{name}.png').read_bytes()
+    img = Image(data=data)
+    icg = IconImage(image=img)
+    return Icon(images=[icg])
+
+
 def open_imaris_file(window):
-    pass
+    path = FileDialogEx.get_open_file_name(window, current_path=str(window.current_path))
+    if path:
+        load_dataset(path, window)
 
 
-from enaml.widgets.api import Label, ObjectCombo
+def load_dataset(path, window):
+    from . import reader
+    window.current_path = path
+    window.reader = reader.ImarisReader(path)
+    window.presenter.obj = window.reader.load()
+
+
+def get_title(reader):
+    if reader is None:
+        return 'Synaptogram'
+    return f'Synaptogram {reader.path.stem}'
 
 
 enamldef SynaptogramWindow(MainWindow): window:
 
+    initial_size = (1000, 1000)
+    icon = load_icon('main-icon')
     attr current_path
     attr presenter
+    attr reader
+    title << get_title(reader)
 
     MenuBar:
         Menu:

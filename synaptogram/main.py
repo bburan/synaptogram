@@ -35,7 +35,7 @@ def main():
     from synaptogram.presenter import SynaptogramPresenter
     from synaptogram.reader import ImarisReader
     with enaml.imports():
-        from synaptogram.gui import SynaptogramWindow
+        from synaptogram.gui import load_dataset, SynaptogramWindow
 
     parser = argparse.ArgumentParser("Synaptogram helper")
     parser.add_argument("path", nargs='?')
@@ -44,20 +44,13 @@ def main():
     app = QtApplication()
     config = get_config()
 
-
-    filename = r'C:/Users/bburan/Downloads/B038-2L-63x-GluR2-CtBP2-MyosinVIIa_IHC_16p0_kHz_15_IHC.ims'
-    reader = ImarisReader(filename)
-    obj = reader.load()
-
-    current_path = config['DEFAULT']['current_path']
     view = SynaptogramWindow(
-            current_path=current_path,
-            presenter=SynaptogramPresenter(obj=obj),
-            )
-    print(view.presenter)
-    print(view.presenter.obj)
+            current_path=config['DEFAULT']['current_path'],
+            presenter=SynaptogramPresenter(),
+    )
     if args.path is not None:
         deferred_call(load_dataset, args.path, view)
+
     view.show()
     app.start()
     app.stop()
