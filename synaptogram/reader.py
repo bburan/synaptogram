@@ -1,4 +1,5 @@
 from functools import cached_property
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -6,6 +7,7 @@ import pandas as pd
 import tables as tb
 
 from .model import Points
+
 
 def extract_value(attrs, key):
     return float(''.join(attrs[key].astype('U')))
@@ -42,9 +44,9 @@ class BaseReader:
 
 class BaseImarisReader(BaseReader):
 
-    def __init__(self, filename):
-        self.filename = filename
-        self.fh = tb.open_file(filename)
+    def __init__(self, path):
+        super().__init__(path)
+        self.fh = tb.open_file(path)
 
     @cached_property
     def points(self):
