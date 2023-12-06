@@ -76,17 +76,24 @@ class PointsPresenter(NDImageCollectionPresenter):
 
     def right_button_press(self, event):
         x, y = event.xdata, event.ydata
-        self.selected = self.obj.select_tile(x, y)
-        self.selected_coords = x, y
+        self.selected = self.obj.select_tile_by_coords(x, y)
         self.artist.request_redraw()
 
     def key_press(self, event):
         if event.key.lower() == 'd':
-            self.obj.label_tile(*self.selected_coords, 'artifact')
+            self.obj.label_tile(self.selected['i'], 'artifact')
         if event.key.lower() == 'o':
-            self.obj.label_tile(*self.selected_coords, 'orphan')
+            self.obj.label_tile(self.selected['i'], 'orphan')
         if event.key.lower() == 'c':
-            self.obj.unlabel_tile(*self.selected_coords)
+            self.obj.unlabel_tile(self.selected['i'])
+        if event.key.lower() == 'right':
+            self.selected = self.obj.select_next_tile(self.selected['i'], 1)
+        if event.key.lower() == 'left':
+            self.selected = self.obj.select_next_tile(self.selected['i'], -1)
+        if event.key.lower() == 'up':
+            self.selected = self.obj.select_next_tile(self.selected['i'], self.obj.n_cols)
+        if event.key.lower() == 'down':
+            self.selected = self.obj.select_next_tile(self.selected['i'], -self.obj.n_cols)
         self.artist.request_redraw()
 
     def check_for_changes(self):
@@ -101,7 +108,8 @@ class PointProjectionPresenter(FigurePresenter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.axes.set_axis_off()
-        self.artist = self.axes.imshow(np.array([[0, 1], [0, 1]]), origin="lower")
+        self.artist = AxesImage(self.axes, data=np.array([[]]), origin='lower')
+        self.axes.add_artist(self.artist)
 
     def highlight_selected(self, event):
         tile = self.obj.tiles[event['value']['i']]

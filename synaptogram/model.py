@@ -10,7 +10,9 @@ from ndimage_enaml.util import get_image, tile_images
 
 
 class TiledNDImage(Atom):
-
+    '''
+    This duck-types some things in NDImage that allow us to use this with the NDImageView.
+    '''
     info = Dict()
     tile_info = Typed(pd.DataFrame)
     tiles = Typed(np.ndarray)
@@ -33,14 +35,13 @@ class TiledNDImage(Atom):
         if self.sort_channel:
             c = self.channel_names.index(self.sort_channel)
             tiles = self.tiles[..., c] * template
-            self.ordering = fn(tiles, axis=(1, 2, 3)).argsort()
+            self.ordering = fn(tiles, axis=(1, 2, 3)).argsort().tolist()
         else:
             tiles = self.tiles * template[..., np.newaxis]
-            self.ordering = fn(self.tiles, axis=(1, 2, 3, 4)).argsort()
+            self.ordering = fn(self.tiles, axis=(1, 2, 3, 4)).argsort().tolist()
         images = get_image(self.tiles, self.channel_names, *args, **kwargs)
 
-        ordering = self.ordering.tolist()
-        labels = {l: [ordering.index(i) for i in s] for l, s in self.labels.items()}
+        labels = {l: [self.ordering.index(i) for i in s] for l, s in self.labels.items()}
         return tile_images(images[self.ordering], self.n_cols, self.padding, labels)
 
     @property
@@ -78,14 +79,18 @@ class TiledNDImage(Atom):
             return self.ordering[i]
         return -1
 
-    def label_tile(self, x, y, label):
-        i = self.tile_index(x, y)
+    def select_next_tile(self, i, step):
+        j = self.ordering.index(i) + step
+        if not (0 <= j < len(self.ordering)):
+            return self._select_tile(i)
+        return self._select_tile(self.ordering[j])
+
+    def label_tile(self, i, label):
         if i == -1:
             return
         self.labels.setdefault(label, set()).add(i)
 
-    def unlabel_tile(self, x, y, label=None):
-        i = self.tile_index(x, y)
+    def unlabel_tile(self, i, label=None):
         if i == -1:
             return
         if label is None:
@@ -95,10 +100,13 @@ class TiledNDImage(Atom):
                 if i in indices:
                     indices.remove(i)
 
-    def select_tile(self, x, y):
+    def select_tile_by_coords(self, x, y):
         i = self.tile_index(x, y)
         if i == -1:
             return
+        return self._select_tile(i)
+
+    def _select_tile(self,  i):
         self.labels['selected'] = set([i])
         result = self.tile_info.iloc[i].to_dict()
         result['i'] = i
