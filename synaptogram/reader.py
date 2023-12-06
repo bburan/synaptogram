@@ -136,5 +136,5 @@ class ImarisReader(BaseImarisReader):
         points = super().points
         names = points.index.names[:]
         points = points.reset_index()
-        points['marker'].map(lambda x: 'CtBP2' if x == 'Spots 1' else x)
+        points['marker'] = points['marker'].map(lambda x: 'CtBP2' if x == 'Spots 1' else x)
         return points.set_index(names)
