@@ -65,7 +65,7 @@ enamldef SynaptogramWindow(MainWindow): window:
                         open_imaris_file(window)
                     except Exception as e:
                         log.exception(e)
-                        critical(Window, 'Open', str(e))
+                        critical(window, 'Open', str(e))
 
     Container:
         DockArea: workspace:
