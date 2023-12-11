@@ -171,5 +171,5 @@ class SynaptogramPresenter(StatePersistenceMixin):
         unsaved = self.get_full_state()['data']['points']['labels']
         saved.pop('selected', None)
         unsaved.pop('selected', None)
-        get_labels = lambda s: {k: list(int(i) for i in v) for k, v in s.items()}
+        get_labels = lambda s: {k: list(int(i) for i in v) for k, v in s.items() if len(v) > 0}
         self.unsaved_changes = get_labels(saved) != get_labels(unsaved)
