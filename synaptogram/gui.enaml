@@ -3,27 +3,28 @@ log = logging.getLogger(__name__)
 
 from importlib import resources
 
+from enaml.application import deferred_call
 from enaml.core.api import Conditional
 from enaml.icon import Icon, IconImage
 from enaml.image import Image
 from enaml.layout.api import (
-        align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout, TabLayout, VSplitLayout
+    align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout,
+    InsertItem, TabLayout, VSplitLayout
 )
 from enaml.stdlib.fields import FloatField
-from enaml.stdlib.message_box import critical
+from enaml.stdlib.message_box import critical, information, question
 from enaml.widgets.api import (
     Action, Container, DockArea, DockItem, FileDialogEx, Label, MainWindow,
-    Menu, MenuBar, MPLCanvas, ObjectCombo
+    Menu, MenuBar, MPLCanvas, ObjectCombo, Splitter, SplitItem
 )
 
 
-from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageDockItem
+from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageContainer
 
 
 def load_icon(name):
     data = resources.files('synaptogram.icons').joinpath(f'{name}.png').read_bytes()
-    img = Image(data=data)
-    icg = IconImage(image=img)
+    icg = IconImage(image=Image(data=data))
     return Icon(images=[icg])
 
 
@@ -36,94 +37,138 @@ def open_imaris_file(window):
 def load_dataset(path, window):
     from . import reader
     window.current_path = path
-    window.reader = reader.ImarisReader(path)
-    window.presenter.obj = window.reader.load()
+    window.presenter.reader = reader.ImarisReader(path)
+    window.presenter.obj = window.presenter.reader.load()
+    area = window.find('area')
+    PointsDockItem(area, presenter=window.presenter)
+    deferred_call(area.update_layout, InsertItem(item='points'))
 
 
-def get_title(reader):
+def get_title(reader, unsaved_changes):
     if reader is None:
         return 'Synaptogram'
-    return f'Synaptogram {reader.path.stem}'
+    title = f'Synaptogram {reader.path.stem}'
+    if unsaved_changes:
+        return f'{title} *'
+    return title
+
+
+def save_state(parent, presenter):
+    q = 'Your previous analysis will be overwritten. Are you sure?'
+    button = question(parent, 'Confirm action', q)
+    if button is not None and button.text == 'Yes':
+        presenter.save_state()
+        information(parent, 'Analysis saved', 'Analysis has been saved.')
+
+
+def load_state(parent, presenter):
+    if presenter.unsaved_changes:
+        q = 'There are unsaved changes. Your current analysis will be lost. Are you sure?'
+        button = question(parent, 'Confirm action', q)
+        if button is None or button.text == 'No':
+            return
+    try:
+        presenter.load_state()
+        information(parent, 'Analysis loaded', 'Analysis has been loaded.')
+    except Exception as e:
+        log.exception(e)
+        information(parent, 'Error', str(e))
+
+
+enamldef PointsContainer(Container):
+    alias presenter: dc.presenter
+    DisplayConfig: dc:
+        padding = 0
+    Container:
+        padding = 0
+        constraints = [
+            hbox(sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label, spacer(0)),
+            align('v_center', sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label)
+        ]
+        Label: sort_label:
+            text = 'Sort by'
+        ObjectCombo: sort:
+            items << presenter.obj.channel_names
+            selected := presenter.artist.sort_channel
+        ObjectCombo: sort_value:
+            items = ['mean', 'max', 'median']
+            selected := presenter.artist.sort_value
+        Label: sort_value_label:
+            text = 'intensity using a'
+        FloatField: sort_radius:
+            value := presenter.artist.sort_radius
+        Label: sort_radius_label:
+            text = 'um radius'
+
+    NDImageCanvas:
+        toolbar_visible = False
+        figure = presenter.figure
+
+
+enamldef PointsDockItem(DockItem): di:
+    name = 'points'
+    title = 'Points'
+    attr presenter
+
+    Container:
+        Splitter:
+            orientation = 'horizontal'
+            SplitItem:
+                Container:
+                    Splitter:
+                        orientation = 'vertical'
+                        SplitItem:
+                            Container:
+                                NDImageCanvas:
+                                    toolbar_visible = False
+                                    figure = di.presenter.overview.figure
+                        SplitItem:
+                            Container:
+                                NDImageCanvas:
+                                    toolbar_visible = False
+                                    figure = di.presenter.point_projection.figure
+            SplitItem:
+                PointsContainer:
+                    presenter = di.presenter.points
 
 
 enamldef SynaptogramWindow(MainWindow): window:
 
-    initial_size = (1000, 1000)
+    initial_size = (1200, 800)
     icon = load_icon('main-icon')
     attr current_path
     attr presenter
-    attr reader
-    title << get_title(reader)
+
+    title << get_title(presenter.reader, presenter.unsaved_changes)
 
     MenuBar:
         Menu:
             title = '&File'
             Action:
-                text = 'Open Imaris file'
+                text = 'Open Imaris file\tCtrl+O'
                 triggered::
                     try:
                         open_imaris_file(window)
                     except Exception as e:
                         log.exception(e)
                         critical(window, 'Open', str(e))
+            Action:
+                text = 'Save analysis\tCtrl+S'
+                enabled << window.presenter.obj is not None
+                triggered::
+                    save_state(window, presenter)
+            Action:
+                text = 'Load analysis\tCtrl+L'
+                enabled << window.presenter.obj is not None
+                triggered::
+                    load_state(window, presenter)
 
     Container:
         DockArea: workspace:
-            name = 'dock_area'
-            layout = AreaLayout(
-                    HSplitLayout(VSplitLayout('projection', 'overview'), 'points', sizes=[1, 4]),
-                    dock_bars=[DockBarLayout('help', position='left'),]
-                    )
+            name = 'area'
+            layout = AreaLayout(dock_bars=[DockBarLayout('help', position='left')])
 
             DockItem:
                 name = 'help'
                 title = 'Help'
                 closable = False
-
-            DockItem:
-                name = 'projection'
-                title = 'Synapse projection'
-                closable = False
-                Container:
-                    MPLCanvas:
-                        toolbar_visible = False
-                        figure << window.presenter.point_projection.figure
-
-            NDImageDockItem: overview:
-                name = 'overview'
-                title = 'Overview'
-                presenter << window.presenter.overview if window.presenter is not None else None
-
-            DockItem: points:
-                name = 'points'
-                title = 'Points'
-                Conditional:
-                    condition << window.presenter.obj is not None
-                    Container:
-                        DisplayConfig:
-                            presenter << window.presenter.points
-                            padding = 0
-                        Container:
-                            padding = 0
-                            constraints = [
-                                hbox(sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label, spacer(0)),
-                                align('v_center', sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label)
-                            ]
-                            Label: sort_label:
-                                text = 'Sort by'
-                            ObjectCombo: sort:
-                                items << window.presenter.points.obj.channel_names
-                                selected := window.presenter.points.artist.sort_channel
-                            ObjectCombo: sort_value:
-                                items = ['mean', 'max', 'median']
-                                selected := window.presenter.points.artist.sort_value
-                            Label: sort_value_label:
-                                text = 'intensity using a'
-                            FloatField: sort_radius:
-                                value := window.presenter.points.artist.sort_radius
-                            Label: sort_radius_label:
-                                text = 'um radius'
-
-                        NDImageCanvas:
-                            toolbar_visible = False
-                            figure << window.presenter.points.figure

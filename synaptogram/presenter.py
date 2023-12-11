@@ -1,4 +1,6 @@
-from atom.api import Atom, Bool, Event, Float, Instance, Int, Str, Typed, Value
+from copy import deepcopy
+
+from atom.api import Atom, Bool, Dict, Event, Float, Instance, Int, Str, Typed, Value
 from enaml.application import deferred_call
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -11,6 +13,7 @@ from ndimage_enaml.util import project_image
 from ndimage_enaml.presenter import FigurePresenter, NDImageCollectionPresenter, NDImagePlot, StatePersistenceMixin
 
 from .model import Points, TiledNDImage
+from .reader import BaseReader
 
 
 class OverviewPresenter(NDImageCollectionPresenter):
@@ -24,6 +27,8 @@ class OverviewPresenter(NDImageCollectionPresenter):
 
     def highlight_selected(self, event):
         value = event['value']
+        if not value:
+            return
         span = 6
         extent = (
                 value['x'] - span,
@@ -61,40 +66,58 @@ class PointsPresenter(NDImageCollectionPresenter):
 
     obj = Instance(TiledNDImage)
     artist = Value()
-    selected = Value()
+    selected = Dict()
     selected_coords = Value()
+
+    def _default_artist(self):
+        artist = TiledNDImagePlot(self.axes)
+        artist.observe('updated', self.request_redraw)
+        return artist
 
     @property
     def current_artist(self):
         return self.artist
 
     def _observe_obj(self, event):
-        self.artist = TiledNDImagePlot(self.axes, self.obj)
-        self.artist.observe('updated', self.update)
-        self.axes.axis('equal')
-        self.axes.axis(self.obj.get_image_extent())
+        self.artist.ndimage = self.obj
 
     def right_button_press(self, event):
         x, y = event.xdata, event.ydata
         self.selected = self.obj.select_tile_by_coords(x, y)
-        self.artist.request_redraw()
+        self.request_redraw()
 
     def key_press(self, event):
         if event.key.lower() == 'd':
+            self.obj.unlabel_tile(self.selected['i'])
             self.obj.label_tile(self.selected['i'], 'artifact')
         if event.key.lower() == 'o':
+            self.obj.unlabel_tile(self.selected['i'])
             self.obj.label_tile(self.selected['i'], 'orphan')
         if event.key.lower() == 'c':
             self.obj.unlabel_tile(self.selected['i'])
         if event.key.lower() == 'right':
-            self.selected = self.obj.select_next_tile(self.selected['i'], 1)
+            self.select_next_tile(1)
         if event.key.lower() == 'left':
-            self.selected = self.obj.select_next_tile(self.selected['i'], -1)
+            self.select_next_tile(-1)
         if event.key.lower() == 'up':
-            self.selected = self.obj.select_next_tile(self.selected['i'], self.obj.n_cols)
+            self.select_next_tile(self.obj.n_cols)
         if event.key.lower() == 'down':
-            self.selected = self.obj.select_next_tile(self.selected['i'], -self.obj.n_cols)
-        self.artist.request_redraw()
+            self.select_next_tile(-self.obj.n_cols)
+        self.request_redraw()
+
+    def select_next_tile(self, step):
+        with self.suppress_notifications():
+            if step is None:
+                i = self.obj.ordering[0]
+                step = 0
+            else:
+                i = self.selected.get('i', self.obj.ordering[0])
+        self.selected = self.obj.select_next_tile(i, step)
+        self.request_redraw()
+
+    def redraw(self):
+        self.artist.redraw()
+        super().redraw()
 
     def check_for_changes(self):
         pass
@@ -113,7 +136,7 @@ class PointProjectionPresenter(FigurePresenter):
 
     def highlight_selected(self, event):
         tile = self.obj.tiles[event['value']['i']]
-        img = project_image(tile, self.obj.channel_names)
+        img = project_image(tile, self.obj.get_channel_config())
         self.artist.set_data(img)
         y, x = img.shape[:2]
         self.artist.set_extent((0, x, 0, y))
@@ -123,20 +146,22 @@ class PointProjectionPresenter(FigurePresenter):
 class SynaptogramPresenter(StatePersistenceMixin):
 
     obj = Typed(object)
-    overview = Instance(OverviewPresenter, {})
-    points = Instance(PointsPresenter, {})
-    point_projection = Instance(PointProjectionPresenter, {})
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.points.observe('selected', self.overview.highlight_selected)
-        self.points.observe('selected', self.point_projection.highlight_selected)
+    reader = Instance(BaseReader)
+    overview = Instance(OverviewPresenter)
+    points = Instance(PointsPresenter)
+    point_projection = Instance(PointProjectionPresenter)
 
     def _observe_obj(self, event):
         if self.obj is not None:
-            self.overview.obj = NDImageCollection([self.obj.overview])
-            self.points.obj = self.obj.points
-            self.point_projection.obj = self.obj.points
+            self.overview = OverviewPresenter(obj=NDImageCollection([self.obj.overview]))
+            self.point_projection = PointProjectionPresenter(obj=self.obj.points)
+            self.points = PointsPresenter(obj=self.obj.points)
+            self.points.observe('selected', self.overview.highlight_selected)
+            self.points.observe('selected', self.point_projection.highlight_selected)
+
+            deferred_call(self.points.select_next_tile, None)
+            self.obj.points.observe('labels_updated', self.check_for_changes)
+
     def update_state(self):
         super().update_state()
         self.points.request_redraw()
