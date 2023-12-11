@@ -9,7 +9,7 @@ from enaml.icon import Icon, IconImage
 from enaml.image import Image
 from enaml.layout.api import (
     align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout,
-    InsertItem, TabLayout, VSplitLayout
+    InsertTab, TabLayout, VSplitLayout
 )
 from enaml.stdlib.fields import FloatField
 from enaml.stdlib.message_box import critical, information, question
@@ -20,6 +20,8 @@ from enaml.widgets.api import (
 
 
 from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageContainer
+
+from .presenter import SynaptogramPresenter
 
 
 def load_icon(name):
@@ -35,40 +37,44 @@ def open_imaris_file(window):
 
 
 def load_dataset(path, window):
-    from . import reader
+    from .reader import ImarisReader
+
     window.current_path = path
-    window.presenter.reader = reader.ImarisReader(path)
-    window.presenter.obj = window.presenter.reader.load()
+    reader = ImarisReader(path)
+    presenter = SynaptogramPresenter(obj=reader.load(), reader=reader)
+
     area = window.find('area')
-    PointsDockItem(area, presenter=window.presenter)
-    deferred_call(area.update_layout, InsertItem(item='points'))
+    PointsDockItem(area, reader=reader, presenter=presenter)
+    deferred_call(area.update_layout, InsertTab(item='points'))
+    window.presenters.append(presenter)
 
 
 def get_title(reader, unsaved_changes):
-    if reader is None:
-        return 'Synaptogram'
-    title = f'Synaptogram {reader.path.stem}'
+    title = f'{reader.path.stem}'
     if unsaved_changes:
-        return f'{title} *'
+        return f'*{title}'
     return title
 
 
-def save_state(parent, presenter):
+def save_state(parent, presenters):
     q = 'Your previous analysis will be overwritten. Are you sure?'
     button = question(parent, 'Confirm action', q)
     if button is not None and button.text == 'Yes':
-        presenter.save_state()
+        for presenter in presenters:
+            presenter.save_state()
         information(parent, 'Analysis saved', 'Analysis has been saved.')
 
 
-def load_state(parent, presenter):
-    if presenter.unsaved_changes:
+def load_state(parent, presenters):
+    if any(p.unsaved_changes for p in presenters):
         q = 'There are unsaved changes. Your current analysis will be lost. Are you sure?'
         button = question(parent, 'Confirm action', q)
         if button is None or button.text == 'No':
             return
     try:
-        presenter.load_state()
+        for presenter in presenters:
+            print('loading state')
+            presenter.load_state()
         information(parent, 'Analysis loaded', 'Analysis has been loaded.')
     except Exception as e:
         log.exception(e)
@@ -109,6 +115,8 @@ enamldef PointsDockItem(DockItem): di:
     name = 'points'
     title = 'Points'
     attr presenter
+    attr reader
+    title << get_title(reader, presenter.unsaved_changes)
 
     Container:
         Splitter:
@@ -137,9 +145,9 @@ enamldef SynaptogramWindow(MainWindow): window:
     initial_size = (1200, 800)
     icon = load_icon('main-icon')
     attr current_path
-    attr presenter
+    attr presenters = []
 
-    title << get_title(presenter.reader, presenter.unsaved_changes)
+    title = 'Synaptogram'
 
     MenuBar:
         Menu:
@@ -154,14 +162,12 @@ enamldef SynaptogramWindow(MainWindow): window:
                         critical(window, 'Open', str(e))
             Action:
                 text = 'Save analysis\tCtrl+S'
-                enabled << window.presenter.obj is not None
                 triggered::
-                    save_state(window, presenter)
+                    save_state(window, presenters)
             Action:
                 text = 'Load analysis\tCtrl+L'
-                enabled << window.presenter.obj is not None
                 triggered::
-                    load_state(window, presenter)
+                    load_state(window, presenters)
 
     Container:
         DockArea: workspace:

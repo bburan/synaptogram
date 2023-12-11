@@ -46,7 +46,6 @@ def main():
 
     view = SynaptogramWindow(
             current_path=config['DEFAULT']['current_path'],
-            presenter=SynaptogramPresenter(),
     )
     if args.path is not None:
         deferred_call(load_dataset, args.path, view)
