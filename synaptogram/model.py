@@ -16,7 +16,7 @@ class TiledNDImage(Atom):
     info = Dict()
     tile_info = Typed(pd.DataFrame)
     tiles = Typed(np.ndarray)
-    n_cols = Int(15)
+    n_cols = Int(12)
     padding = Int(3)
 
     sort_channel = Str()
