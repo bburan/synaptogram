@@ -24,6 +24,8 @@ class OverviewPresenter(NDImageCollectionPresenter):
         super().__init__(*args, **kwargs)
         self.highlight_artist = Circle((0, 0), radius=0, linewidth=1, facecolor='none', edgecolor='white')
         self.axes.add_patch(self.highlight_artist)
+        self.current_artist.display_mode = 'slice'
+        self.current_artist.z_slice_thickness = 10
 
     def highlight_selected(self, event):
         value = event['value']
@@ -88,13 +90,11 @@ class PointsPresenter(NDImageCollectionPresenter):
 
     def key_press(self, event):
         if event.key.lower() == 'd':
-            self.obj.unlabel_tile(self.selected['i'])
-            self.obj.label_tile(self.selected['i'], 'artifact')
+            self.apply_label('artifact')
         if event.key.lower() == 'o':
-            self.obj.unlabel_tile(self.selected['i'])
-            self.obj.label_tile(self.selected['i'], 'orphan')
+            self.apply_label('orphan')
         if event.key.lower() == 'c':
-            self.obj.unlabel_tile(self.selected['i'])
+            self.clear_label()
         if event.key.lower() == 'right':
             self.select_next_tile(1)
         if event.key.lower() == 'left':
@@ -103,6 +103,14 @@ class PointsPresenter(NDImageCollectionPresenter):
             self.select_next_tile(self.obj.n_cols)
         if event.key.lower() == 'down':
             self.select_next_tile(-self.obj.n_cols)
+
+    def apply_label(self, label):
+        self.obj.unlabel_tile(self.selected['i'])
+        self.obj.label_tile(self.selected['i'], label)
+        self.request_redraw()
+
+    def clear_label(self):
+        self.obj.unlabel_tile(self.selected['i'])
         self.request_redraw()
 
     def select_next_tile(self, step):
@@ -127,19 +135,34 @@ class PointProjectionPresenter(FigurePresenter):
 
     obj = Value()
     artist = Value()
+    vertical_crosshairs = Value()
+    horizontal_crosshairs = Value()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.axes.set_axis_off()
         self.artist = AxesImage(self.axes, data=np.array([[]]), origin='lower')
         self.axes.add_artist(self.artist)
+        self.axes.axis('equal')
+        self.vertical_crosshairs = [self.axes.axvline(0, color='w', ls=':', alpha=0.5) for _ in range(6)]
+        self.horizontal_crosshairs = [self.axes.axhline(0, color='w', ls=':', alpha=0.5) for _ in range(2)]
 
     def highlight_selected(self, event):
+        padding = 1
         tile = self.obj.tiles[event['value']['i']]
-        img = project_image(tile, self.obj.get_channel_config())
+        img = project_image(tile, self.obj.get_channel_config(), padding)
         self.artist.set_data(img)
         y, x = img.shape[:2]
         self.artist.set_extent((0, x, 0, y))
+
+        xs, ys, _, _ = tile.shape
+        for i, a in enumerate(self.vertical_crosshairs):
+            o = i * (xs + padding) + padding + xs * 0.5
+            a.set_data(([o, o], [0, 1]))
+        for i, a in enumerate(self.horizontal_crosshairs):
+            o = i * (xs + padding) + padding + ys * 0.5
+            a.set_data(([0, 1], [o, o]))
+
         self.figure.canvas.draw()
 
 

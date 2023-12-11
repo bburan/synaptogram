@@ -9,17 +9,17 @@ from enaml.icon import Icon, IconImage
 from enaml.image import Image
 from enaml.layout.api import (
     align, hbox, spacer, AreaLayout, DockBarLayout, HSplitLayout,
-    InsertTab, TabLayout, VSplitLayout
+    InsertTab, TabLayout, vbox, VSplitLayout
 )
 from enaml.stdlib.fields import FloatField
 from enaml.stdlib.message_box import critical, information, question
 from enaml.widgets.api import (
     Action, Container, DockArea, DockItem, FileDialogEx, Label, MainWindow,
-    Menu, MenuBar, MPLCanvas, ObjectCombo, Splitter, SplitItem
+    Menu, MenuBar, MPLCanvas, ObjectCombo, PushButton, Splitter, SplitItem
 )
 
 
-from ndimage_enaml.gui import DisplayConfig, NDImageCanvas, NDImageContainer
+from ndimage_enaml.gui import bind_focus, DisplayConfig, NDImageCanvas, NDImageContainer
 
 from .presenter import SynaptogramPresenter
 
@@ -38,14 +38,13 @@ def open_imaris_file(window):
 
 def load_dataset(path, window):
     from .reader import ImarisReader
-
     window.current_path = path
     reader = ImarisReader(path)
     presenter = SynaptogramPresenter(obj=reader.load(), reader=reader)
-
+    presenter.load_state()
     area = window.find('area')
     PointsDockItem(area, reader=reader, presenter=presenter)
-    deferred_call(area.update_layout, InsertTab(item='points'))
+    deferred_call(area.update_layout, InsertTab(item='points', target='help'))
     window.presenters.append(presenter)
 
 
@@ -73,7 +72,6 @@ def load_state(parent, presenters):
             return
     try:
         for presenter in presenters:
-            print('loading state')
             presenter.load_state()
         information(parent, 'Analysis loaded', 'Analysis has been loaded.')
     except Exception as e:
@@ -81,34 +79,70 @@ def load_state(parent, presenters):
         information(parent, 'Error', str(e))
 
 
-enamldef PointsContainer(Container):
-    alias presenter: dc.presenter
-    DisplayConfig: dc:
-        padding = 0
-    Container:
-        padding = 0
-        constraints = [
-            hbox(sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label, spacer(0)),
-            align('v_center', sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label)
-        ]
-        Label: sort_label:
-            text = 'Sort by'
-        ObjectCombo: sort:
-            items << presenter.obj.channel_names
-            selected := presenter.artist.sort_channel
-        ObjectCombo: sort_value:
-            items = ['mean', 'max', 'median']
-            selected := presenter.artist.sort_value
-        Label: sort_value_label:
-            text = 'intensity using a'
-        FloatField: sort_radius:
-            value := presenter.artist.sort_radius
-        Label: sort_radius_label:
-            text = 'um radius'
+enamldef PointsContainer(Container): container:
+    attr presenter
+    attr main_presenter
 
-    NDImageCanvas:
-        toolbar_visible = False
-        figure = presenter.figure
+    initialized ::
+        # This tries to force focus back to the canvas where possible
+        bind_focus(container.children, canvas.set_focus)
+        deferred_call(bind_focus, container.children, canvas.set_focus)
+        deferred_call(canvas.set_focus)
+
+    constraints = [
+        vbox(
+            dc,
+            hbox(sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label, spacer(0)),
+            hbox(pb_artifact, pb_orphan, pb_clear, spacer(0), pb_load, pb_save),
+            canvas,
+        ),
+        align('v_center', sort_label, sort, sort_value, sort_value_label, sort_radius, sort_radius_label),
+        align('v_center', pb_artifact, pb_orphan, pb_clear, pb_load, pb_save),
+        align('left', dc.children[1], sort)
+    ]
+
+    DisplayConfig: dc:
+        presenter << container.presenter
+
+    Label: sort_label:
+        text = 'Sort by'
+    ObjectCombo: sort:
+        items << presenter.obj.channel_names
+        selected := presenter.artist.sort_channel
+    ObjectCombo: sort_value:
+        items = ['mean', 'max', 'median']
+        selected := presenter.artist.sort_value
+    Label: sort_value_label:
+        text = 'intensity using a'
+    FloatField: sort_radius:
+        value := presenter.artist.sort_radius
+    Label: sort_radius_label:
+        text = 'um radius'
+
+    PushButton: pb_artifact:
+        text = 'Artifact'
+        clicked ::
+            presenter.apply_label('artifact')
+    PushButton: pb_orphan:
+        text = 'Orphan'
+        clicked ::
+            presenter.apply_label('orphan')
+    PushButton: pb_clear:
+        text = 'Clear'
+        clicked ::
+            presenter.clear_label()
+
+    PushButton: pb_save:
+        text = 'Save'
+        clicked ::
+            save_state(self, [main_presenter])
+    PushButton: pb_load:
+        text = 'Load'
+        clicked ::
+            load_state(self, [main_presenter])
+
+    NDImageCanvas: canvas:
+        figure = container.presenter.figure
 
 
 enamldef PointsDockItem(DockItem): di:
@@ -126,18 +160,17 @@ enamldef PointsDockItem(DockItem): di:
                     Splitter:
                         orientation = 'vertical'
                         SplitItem:
-                            Container:
-                                NDImageCanvas:
-                                    toolbar_visible = False
-                                    figure = di.presenter.overview.figure
+                            NDImageContainer:
+                                focus_canvas = False
+                                presenter = di.presenter.overview
                         SplitItem:
                             Container:
                                 NDImageCanvas:
-                                    toolbar_visible = False
                                     figure = di.presenter.point_projection.figure
             SplitItem:
                 PointsContainer:
                     presenter = di.presenter.points
+                    main_presenter = di.presenter
 
 
 enamldef SynaptogramWindow(MainWindow): window:
@@ -161,18 +194,20 @@ enamldef SynaptogramWindow(MainWindow): window:
                         log.exception(e)
                         critical(window, 'Open', str(e))
             Action:
-                text = 'Save analysis\tCtrl+S'
+                separator = True
+            Action:
+                text = 'Save analysis'
                 triggered::
                     save_state(window, presenters)
             Action:
-                text = 'Load analysis\tCtrl+L'
+                text = 'Load analysis'
                 triggered::
                     load_state(window, presenters)
 
     Container:
         DockArea: workspace:
             name = 'area'
-            layout = AreaLayout(dock_bars=[DockBarLayout('help', position='left')])
+            layout = AreaLayout('help')
 
             DockItem:
                 name = 'help'
