@@ -1,4 +1,5 @@
 from functools import cached_property
+import json
 from pathlib import Path
 
 import numpy as np
@@ -130,6 +131,14 @@ class BaseImarisReader(BaseReader):
 
 
 class ImarisReader(BaseImarisReader):
+
+    def save_state(self, obj, state):
+        filename = self.path.with_suffix('.json')
+        filename.write_text(json.dumps(state, indent=4))
+
+    def load_state(self, obj):
+        filename = self.path.with_suffix('.json')
+        return json.loads(filename.read_text())
 
     @cached_property
     def points(self):

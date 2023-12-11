@@ -112,6 +112,17 @@ class TiledNDImage(Atom):
         result['i'] = i
         return result
 
+    def get_state(self):
+        labels = {l: i for l, i in self.labels.items() if l != 'selected'}
+        return {
+            'labels': labels,
+        }
+
+    def set_state(self, state):
+        for label, indices in state['labels'].items():
+            indices = {int(k): v for k, v in indices.items()}
+            self.labels[label] = indices
+
 
 class Points(Atom):
 
@@ -121,3 +132,13 @@ class Points(Atom):
     def __init__(self, image_info, image, point_info, point_images):
         self.overview = NDImage(image_info, image)
         self.points = TiledNDImage(image_info, point_info, point_images)
+
+    def get_state(self):
+        return {
+            'overview': self.overview.get_state(),
+            'points': self.points.get_state(),
+        }
+
+    def set_state(self, state):
+        self.overview.set_state(state['overview'])
+        self.points.set_state(state['points'])

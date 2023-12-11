@@ -8,7 +8,7 @@ import numpy as np
 
 from ndimage_enaml.model import NDImageCollection
 from ndimage_enaml.util import project_image
-from ndimage_enaml.presenter import FigurePresenter, NDImageCollectionPresenter, NDImagePlot
+from ndimage_enaml.presenter import FigurePresenter, NDImageCollectionPresenter, NDImagePlot, StatePersistenceMixin
 
 from .model import Points, TiledNDImage
 
@@ -120,7 +120,7 @@ class PointProjectionPresenter(FigurePresenter):
         self.figure.canvas.draw()
 
 
-class SynaptogramPresenter(Atom):
+class SynaptogramPresenter(StatePersistenceMixin):
 
     obj = Typed(object)
     overview = Instance(OverviewPresenter, {})
@@ -137,3 +137,14 @@ class SynaptogramPresenter(Atom):
             self.overview.obj = NDImageCollection([self.obj.overview])
             self.points.obj = self.obj.points
             self.point_projection.obj = self.obj.points
+    def update_state(self):
+        super().update_state()
+        self.points.request_redraw()
+
+    def check_for_changes(self, event=None):
+        saved = self.saved_state['data']['points']['labels']
+        unsaved = self.get_full_state()['data']['points']['labels']
+        saved.pop('selected', None)
+        unsaved.pop('selected', None)
+        get_labels = lambda s: {k: list(int(i) for i in v) for k, v in s.items()}
+        self.unsaved_changes = get_labels(saved) != get_labels(unsaved)
