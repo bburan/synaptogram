@@ -11,6 +11,7 @@ maintainers = [
     {name = "Brad Buran", email="buran@ohsu.edu"},
 ]
 dependencies = [
+    "ndimage-enaml >= 0.0.3",
     "atom",
     "enaml[qt6-pyside]",
     "matplotlib",
