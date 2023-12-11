@@ -17,7 +17,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pandas",
-	"tables",
+	"h5py",
 ]
 dynamic = ["version"]
 

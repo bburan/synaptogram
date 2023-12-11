@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import tables as tb
+import h5py
 
 from .model import Points
 
@@ -17,14 +17,14 @@ def extract_value(attrs, key):
 def extract_points(node):
     cols = []
     if 'CoordsXYZR' in node:
-        coords = node.CoordsXYZR.read()
+        coords = node['CoordsXYZR'][:]
         cols.extend(['x', 'y', 'z', 'radius_x'])
     else:
         coords = []
     if 'RadiusYZ' in node:
-        radius = node.RadiusYZ.read()
+        radius = node['RadiusYZ'][:]
         cols.extend(['radius_y', 'radius_z'])
-        coords =  np.c_[coords, node.RadiusYZ.read()]
+        coords =  np.c_[coords, radius]
     return pd.DataFrame(coords, columns=cols)
 
 
@@ -47,17 +47,17 @@ class BaseImarisReader(BaseReader):
 
     def __init__(self, path):
         super().__init__(path)
-        self.fh = tb.open_file(path)
+        self.fh = h5py.File(path, 'r')
 
     @cached_property
     def points(self):
         points = []
         keys = []
-        for i, (name, node) in enumerate(self.fh.root.Scene.Content._v_children.items()):
+        for i, (name, node) in enumerate(self.fh['Scene/Content'].items()):
             if name.startswith('Points'):
                 p = extract_points(node)
                 points.append(p)
-                keys.append((i, node._v_attrs['Name'][0].decode('utf')))
+                keys.append((i, node.attrs['Name'][0].decode('utf')))
         points = pd.concat(points, keys=keys, names=['node_index', 'marker', 'i'])
         for d, dim in enumerate('xyz'):
             origin = self.image_info['lower'][d]
@@ -68,7 +68,7 @@ class BaseImarisReader(BaseReader):
 
     @cached_property
     def image_info(self):
-        image_attrs = self.fh.root.DataSetInfo.Image._v_attrs
+        image_attrs = self.fh['DataSetInfo/Image'].attrs
         xlb = extract_value(image_attrs, 'ExtMin0')
         ylb = extract_value(image_attrs, 'ExtMin1')
         zlb = extract_value(image_attrs, 'ExtMin2')
@@ -99,11 +99,9 @@ class BaseImarisReader(BaseReader):
 
     @cached_property
     def image(self):
-        img_node = self.fh.root.DataSet._f_get_child('ResolutionLevel 0/TimePoint 0')
         data = []
-        for channel_node in img_node._f_iter_nodes():
-            d = channel_node.Data[:]
-            data.append(d[..., np.newaxis])
+        for channel_node in self.fh['DataSet/ResolutionLevel 0/TimePoint 0'].values():
+            data.append(channel_node['Data'][:][..., np.newaxis])
         data = np.concatenate(data, axis=-1)
         x, y, z = self.image_info['n_voxels']
         return data[:z, :y, :x].swapaxes(0, 2)
