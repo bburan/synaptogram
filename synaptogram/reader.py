@@ -1,6 +1,7 @@
 from functools import cached_property
 import json
 from pathlib import Path
+import re
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,10 @@ import pandas as pd
 import h5py
 
 from .model import Points
+
+
+def extract_str(attrs, key):
+    return str(''.join(attrs[key].astype('U')))
 
 
 def extract_value(attrs, key):
@@ -90,11 +95,7 @@ class BaseImarisReader(BaseReader):
                 np.abs(yub-ylb) / yvoxels,
                 np.abs(zub-zlb) / zvoxels,
             ],
-            'channels': [
-                {'name': 'GluR2'},
-                {'name': 'CtBP2'},
-                {'name': 'MyosinVIIa'},
-            ],
+            'channels': self.channel_names,
         }
 
     @cached_property
@@ -103,8 +104,22 @@ class BaseImarisReader(BaseReader):
         for channel_node in self.fh['DataSet/ResolutionLevel 0/TimePoint 0'].values():
             data.append(channel_node['Data'][:][..., np.newaxis])
         data = np.concatenate(data, axis=-1)
+
+        # FIgure out sort order of channels to go from lowest to highest
+        # emission wavelength.
+        emission = []
+        for i in range(data.shape[-1]):
+            c_attrs = self.fh[f'DataSetInfo/Channel {i}'].attrs
+            e = extract_str(c_attrs, 'LSMEmissionWavelength')
+            if '-' in e:
+                e = float(e.split('-')[0])
+            else:
+                e = float(e)
+            emission.append(e)
+        i = np.argsort(emission)
+
         x, y, z = self.image_info['n_voxels']
-        return data[:z, :y, :x].swapaxes(0, 2)
+        return data[:z, :y, :x, i].swapaxes(0, 2)
 
     def get_point_volumes(self, point_name, size=10):
         spots = []
@@ -128,6 +143,9 @@ class BaseImarisReader(BaseReader):
         return np.concatenate(volumes, axis=0)
 
 
+P_FILENAME = re.compile('.*63x-((?:\w+-?)*)_IHC_\d+.*')
+
+
 class ImarisReader(BaseImarisReader):
 
     def save_state(self, obj, state):
@@ -145,3 +163,11 @@ class ImarisReader(BaseImarisReader):
         points = points.reset_index()
         points['marker'] = points['marker'].map(lambda x: 'CtBP2' if x == 'Spots 1' else x)
         return points.set_index(names)
+
+    @cached_property
+    def channel_names(self):
+        dyes = P_FILENAME.match(self.path.stem).group(1)
+        channels = []
+        for d in dyes.split('-'):
+            channels.append({'name': d})
+        return channels
