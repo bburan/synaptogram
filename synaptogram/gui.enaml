@@ -45,7 +45,6 @@ def load_dataset(path, window):
     area = window.find('area')
     PointsDockItem(area, reader=reader, presenter=presenter)
     deferred_call(area.update_layout, InsertTab(item='points', target='help'))
-    window.presenters.append(presenter)
 
 
 def get_title(reader, unsaved_changes):
@@ -152,6 +151,12 @@ enamldef PointsDockItem(DockItem): di:
     attr reader
     title << get_title(reader, presenter.unsaved_changes)
 
+    closing ::
+        if presenter.unsaved_changes:
+            button = question(self, 'Question', 'There are unsaved changes. Are you sure you want to close this tab?')
+            if button is None or button.text == 'No':
+                change['value'].ignore()
+
     Container:
         Splitter:
             orientation = 'horizontal'
@@ -178,9 +183,15 @@ enamldef SynaptogramWindow(MainWindow): window:
     initial_size = (1200, 800)
     icon = load_icon('main-icon')
     attr current_path
-    attr presenters = []
 
     title = 'Synaptogram'
+
+    closing ::
+        presenters = [di.presenter for di in workspace.dock_items() if isinstance(di, PointsDockItem)]
+        if any(p.unsaved_changes for p in presenters):
+            button = question(window, 'Question', 'There are unsaved changes. Are you sure you want to exit?')
+            if button is None or button.text == 'No':
+                change['value'].ignore()
 
     MenuBar:
         Menu:
@@ -198,10 +209,12 @@ enamldef SynaptogramWindow(MainWindow): window:
             Action:
                 text = 'Save analysis'
                 triggered::
+                    presenters = [di.presenter for di in workspace.dock_items() if isinstance(di, PointsDockItem)]
                     save_state(window, presenters)
             Action:
                 text = 'Load analysis'
                 triggered::
+                    presenters = [di.presenter for di in workspace.dock_items() if isinstance(di, PointsDockItem)]
                     load_state(window, presenters)
 
     Container:
