@@ -1,0 +1,42 @@
+<h1 id="synaptogram">Synaptogram</h1>
+<h2 id="introduction">Introduction</h2>
+<p>This facilitates screening synaptic ribbons identified in Imaris to determine if they are artifacts or orphans (i.e., without a post-synaptic bouton). This program will work with any Imaris file that contains the <span class="title-ref">Spots</span> feature named <span class="title-ref">CtBP2</span>.</p>
+<h2 id="using-the-program">Using the program</h2>
+<p>Three visualizations are provided:</p>
+<ul>
+<li>Overview image (upper left). When a ribbon is selected, the overview image updates to show the location of the synaptic ribbon (marked with a white circle) in the confocal image. This context can be useful for determining the status of a ribbon.</li>
+<li>Projection of the selected ribbon (lower left). Each channel (GluR2, CtBP2, and Myosin VIIa) are shown separately as maximum projections onto the XY, YZ and XZ planes. The crosshair shows the center of the ribbon in each image. Sometimes other ribbons will appear in the same image, so focus on the crosshair.</li>
+<li>Tiled overview of all ribbons identified by Imaris. The currently selected ribbon is indicated by a white square. Artifacts are indicated by red squares and orphans by green squares.</li>
+</ul>
+<p>Ribbons in the tiled image are sorted by default based on the maximum intensity of the GluR2 label. If needed, you can sort by other criteria. The goal is to identify all ribbons that are artifacts (e.g., in the nucleus or outside the cytoplasm of the inner hair cell) or orphans (i.e., no post-synaptic receptor associated with the ribbon).</p>
+<h3 id="mouse-interaction">Mouse interaction</h3>
+<dl>
+<dt>left click + drag (overview and tiled ribbons)</dt>
+<dd><p>Pan image</p>
+</dd>
+<dt>right click (tiled ribbons visualization only)</dt>
+<dd><p>Select select ribbon for analysis.</p>
+</dd>
+<dt>mouse wheel (overview and tiled ribbons)</dt>
+<dd><p>Zoom in/out</p>
+</dd>
+</dl>
+<h3 id="keyboard-shortcuts">Keyboard shortcuts</h3>
+<p>These keyboard shortcuts only work when the tiled visualization has focus (e.g., by left-clicking on it). The focus is set to the tiled visualization by default, but can be lost if you click on one of the other visualizations in the window.</p>
+<dl>
+<dt>a or d</dt>
+<dd><p>Mark ribbon as artifact</p>
+</dd>
+<dt>o</dt>
+<dd><p>Mark ribbon as orphan</p>
+</dd>
+<dt>c</dt>
+<dd><p>Clear label</p>
+</dd>
+<dt>arrow keys</dt>
+<dd><p>Navigate through the selected ribbons with the arrow keys. Scrolling off the end of one row will take you to the next row.</p>
+</dd>
+<dt>Ctrl + S</dt>
+<dd><p>Save the analysis</p>
+</dd>
+</dl>

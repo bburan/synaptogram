@@ -25,7 +25,8 @@ class OverviewPresenter(NDImageCollectionPresenter):
         self.highlight_artist = Circle((0, 0), radius=0, linewidth=1, facecolor='none', edgecolor='white')
         self.axes.add_patch(self.highlight_artist)
         self.current_artist.display_mode = 'slice'
-        self.current_artist.z_slice_thickness = 10
+        # This sets the thickness to 10
+        self.current_artist.z_slice_ub = 10
 
     def highlight_selected(self, event):
         value = event['value']
@@ -70,6 +71,7 @@ class PointsPresenter(NDImageCollectionPresenter):
     artist = Value()
     selected = Dict()
     selected_coords = Value()
+    parent = Value()
 
     def _default_artist(self):
         artist = TiledNDImagePlot(self.axes)
@@ -91,6 +93,8 @@ class PointsPresenter(NDImageCollectionPresenter):
     def key_press(self, event):
         if event.key.lower() == 'd':
             self.apply_label('artifact')
+        if event.key.lower() == 'a':
+            self.apply_label('artifact')
         if event.key.lower() == 'o':
             self.apply_label('orphan')
         if event.key.lower() == 'c':
@@ -103,6 +107,8 @@ class PointsPresenter(NDImageCollectionPresenter):
             self.select_next_tile(self.obj.n_cols)
         if event.key.lower() == 'down':
             self.select_next_tile(-self.obj.n_cols)
+        if event.key.lower() == 'ctrl+s':
+            self.parent.save_state()
 
     def apply_label(self, label):
         self.obj.unlabel_tile(self.selected['i'])
@@ -178,10 +184,9 @@ class SynaptogramPresenter(StatePersistenceMixin):
         if self.obj is not None:
             self.overview = OverviewPresenter(obj=NDImageCollection([self.obj.overview]))
             self.point_projection = PointProjectionPresenter(obj=self.obj.points)
-            self.points = PointsPresenter(obj=self.obj.points)
+            self.points = PointsPresenter(obj=self.obj.points, parent=self)
             self.points.observe('selected', self.overview.highlight_selected)
             self.points.observe('selected', self.point_projection.highlight_selected)
-
             deferred_call(self.points.select_next_tile, None)
             self.obj.points.observe('labels_updated', self.check_for_changes)
 

@@ -15,7 +15,7 @@ dependencies = [
     "atom",
     "enaml[qt6-pyside]",
     "matplotlib",
-    "numpy",
+    "numpy<2.0", # raster_geometry not compatible with Numpy 2.0
     "pandas",
 	"h5py",
 ]

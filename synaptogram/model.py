@@ -8,6 +8,8 @@ from raster_geometry import sphere
 from ndimage_enaml.model import get_channel_config, make_channel_config, NDImage
 from ndimage_enaml.util import get_image, tile_images
 
+from synaptogram.config import CHANNEL_CONFIG
+
 
 class TiledNDImage(Atom):
     '''
@@ -30,7 +32,7 @@ class TiledNDImage(Atom):
 
     def __init__(self, info, tile_info, tiles, **kwargs):
         super().__init__(info=info, tile_info=tile_info, tiles=tiles, **kwargs)
-        self.channel_config = make_channel_config(info)
+        self.channel_config = make_channel_config(info, CHANNEL_CONFIG)
         self._update_ordering()
 
     @observe('sort_channel', 'sort_value', 'sort_radius')
@@ -147,7 +149,7 @@ class Points(Atom):
     points = Typed(TiledNDImage)
 
     def __init__(self, image_info, image, point_info, point_images):
-        self.overview = NDImage(image_info, image)
+        self.overview = NDImage(image_info, image, channel_defaults=CHANNEL_CONFIG)
         self.points = TiledNDImage(image_info, point_info, point_images)
 
     def get_state(self):
