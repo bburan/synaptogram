@@ -40,15 +40,19 @@ def open_imaris_file(window):
 
 
 def load_dataset(path, window):
+    area = window.find('area')
+    items = area.dock_items()
+    n_items = len(items)
+    target = items[-1].name
+
     from .reader import ImarisReader
     window.current_path = path
     reader = ImarisReader(path)
+
     presenter = SynaptogramPresenter(obj=reader.load(), reader=reader)
     presenter.load_state()
-    area = window.find('area')
-    PointsDockItem(area, reader=reader, presenter=presenter)
-    print('updating layout')
-    deferred_call(area.update_layout, InsertTab(item='points', target='help'))
+    item = PointsDockItem(area, reader=reader, presenter=presenter, name=reader.path.stem)
+    area.update_layout(InsertTab(item=item.name, target=target))
 
 
 def get_title(reader, unsaved_changes):
