@@ -53,6 +53,9 @@ def load_dataset(path, window):
     presenter.load_state()
     item = PointsDockItem(area, reader=reader, presenter=presenter, name=reader.path.stem)
     area.update_layout(InsertTab(item=item.name, target=target))
+    # The timing of this call is important since the canvas needs to be
+    # generated in the GUI so that the images are properly resized after display.
+    deferred_call(presenter.points.select_next_tile, None)
 
 
 def get_title(reader, unsaved_changes):
@@ -150,6 +153,10 @@ enamldef PointsContainer(Container): container:
 
     NDImageCanvas: canvas:
         figure = container.presenter.figure
+        resist_width = 'ignore'
+        resist_height = 'ignore'
+        hug_height = 'ignore'
+        hug_width = 'ignore'
 
 
 enamldef PointsDockItem(DockItem): di:
@@ -176,10 +183,18 @@ enamldef PointsDockItem(DockItem): di:
                             NDImageContainer:
                                 focus_canvas = False
                                 presenter = di.presenter.overview
+                                canvas_resist_width = 'ignore'
+                                canvas_resist_height = 'ignore'
+                                canvas_hug_height = 'ignore'
+                                canvas_hug_width = 'ignore'
                         SplitItem:
                             Container:
                                 NDImageCanvas:
                                     figure = di.presenter.point_projection.figure
+                                    resist_width = 'ignore'
+                                    resist_height = 'ignore'
+                                    hug_height = 'ignore'
+                                    hug_width = 'ignore'
             SplitItem:
                 PointsContainer:
                     presenter = di.presenter.points

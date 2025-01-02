@@ -187,7 +187,6 @@ class SynaptogramPresenter(StatePersistenceMixin):
             self.points = PointsPresenter(obj=self.obj.points, parent=self)
             self.points.observe('selected', self.overview.highlight_selected)
             self.points.observe('selected', self.point_projection.highlight_selected)
-            deferred_call(self.points.select_next_tile, None)
             self.obj.points.observe('labels_updated', self.check_for_changes)
 
     def update_state(self):
