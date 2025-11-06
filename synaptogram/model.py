@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 
 from atom.api import Atom, Dict, Enum, Event, Float, Int, Str, Typed, Value, observe
-from raster_geometry import sphere
 
 from ndimage_enaml.model import get_channel_config, make_channel_config, NDImage
 from ndimage_enaml.util import get_image, tile_images
+from ndimage_enaml.sphere import sphere
 
 from synaptogram.config import CHANNEL_CONFIG
 
