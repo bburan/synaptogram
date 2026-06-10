@@ -5,6 +5,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from skimage.util import img_as_ubyte
 
 import h5py
 
@@ -103,7 +104,9 @@ class BaseImarisReader(BaseReader):
         data = []
         for channel_node in self.fh['DataSet/ResolutionLevel 0/TimePoint 0'].values():
             data.append(channel_node['Data'][:][..., np.newaxis])
-        data = np.concatenate(data, axis=-1)
+
+        # TODO: Add a way to specify bitness
+        data = img_as_ubyte(np.concatenate(data, axis=-1))
 
         # FIgure out sort order of channels to go from lowest to highest
         # emission wavelength.
@@ -113,6 +116,8 @@ class BaseImarisReader(BaseReader):
             e = extract_str(c_attrs, 'LSMEmissionWavelength')
             if '-' in e:
                 e = float(e.split('-')[0])
+            elif e.endswith('nm'):
+                e = float(e.split(' ')[0])
             else:
                 e = float(e)
             emission.append(e)
@@ -143,7 +148,7 @@ class BaseImarisReader(BaseReader):
         return np.concatenate(volumes, axis=0)
 
 
-P_FILENAME = re.compile('.*63x-((?:\w+-?)*)_IHC_\d+.*')
+P_FILENAME = re.compile(r'.*63x-((?:\w+-?)*)_IHC_\d+.*')
 
 
 class ImarisReader(BaseImarisReader):
@@ -166,8 +171,21 @@ class ImarisReader(BaseImarisReader):
 
     @cached_property
     def channel_names(self):
-        dyes = P_FILENAME.match(self.path.stem).group(1)
+        match = P_FILENAME.match(self.path.stem)
+        if match is not None:
+            return [{'name': d} for d in match.group(1).split('-')]
+        # Fallback: read channel names from the IMS file itself. Imaris stores
+        # them under DataSetInfo/Channel {i} as the 'Name' attribute (with
+        # 'DyeName' as a secondary fallback).
         channels = []
-        for d in dyes.split('-'):
-            channels.append({'name': d})
+        i = 0
+        while f'DataSetInfo/Channel {i}' in self.fh:
+            attrs = self.fh[f'DataSetInfo/Channel {i}'].attrs
+            for key in ('Name', 'DyeName'):
+                if key in attrs:
+                    channels.append({'name': extract_str(attrs, key)})
+                    break
+            else:
+                channels.append({'name': f'Channel {i}'})
+            i += 1
         return channels
